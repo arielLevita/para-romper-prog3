@@ -1,0 +1,13 @@
+{
+  "name": "creando_servidor_ariel",
+  "version": "1.0.0",
+  "description": "primer servidor",
+  "main": "app.js",
+  "scripts": {
+    "start": "node --watch app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ariel",
+  "license": "ISC",
+  "type": "module"
+}
