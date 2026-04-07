@@ -159,21 +159,23 @@ const eliminarPrimero = async () => {
     const final = JSON.stringify(lista, null, 2);
     await fs.writeFile("./personajes.json", final)
 
-    return ("Primer personaje eliminado:", mostrar);
+    return mostrar;
 }
 
 // d) Crear un nuevo archivo que solo contenga los: id y nombres de los personajes.
 
 const listaCompleta = await mostrarPersonaje();
 
-let listaReducida = listaCompleta.map( personaje =>  ({
+const listaArray = JSON.parse(listaCompleta);
+
+let listaReducida = listaArray.map( personaje =>  ({
     id: personaje.id,
     fullName: personaje.fullName
 }));
 
 const crearNuevoArchivo = async (listaReducida) => {
     
-    fs.writeFile("./archivo2.json", JSON.stringify(listaReducida, null, 2))
+    await fs.writeFile("./archivo2.json", JSON.stringify(listaReducida, null, 2))
     return ("Nuevo archivo creado correctamente.")
 
 } 
