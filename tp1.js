@@ -8,7 +8,7 @@ async function mostrarPersonaje() {
             console.log("Error");
         }
         const todos = await resp.json();
-        const final = JSON.stringify(todos)
+        const final = JSON.stringify(todos, null, 2)
         return final
 
     }
