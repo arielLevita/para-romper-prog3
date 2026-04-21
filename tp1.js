@@ -1,48 +1,110 @@
-const url = "https://thronesapi.com/api/v2/Characters"
+import fs from 'fs/promises';
 
-// a) Recuperar la información de todos los personajes (GET).
-async function mostrarPersonaje() {
+const url = "https://thronesapi.com/api/v2/Characters";
+const nombreArchivo = 'personajes.json';
+const nombreArchivoReducido = 'archivoReducido.json';
+
+
+async function obtenerPersonajesDesdeUrl() {
     try {
-        const resp = await fetch(url);
-        if (!resp.ok) {
-            console.log("Error");
+        const res = await fetch(url);
+        if (!res.ok) {
+            throw new Error(`Error HTTP: ${res.status}`);
         }
-        const todos = await resp.json();
-        const final = JSON.stringify(todos)
-        return final
-
-    }
-    catch (error) {
-        console.log(`Error ${error}`)
+                
+        const personajes = await res.json();
+        return personajes;
+    } catch (error) {
+        console.error("Error en fetch a la API: ", error);
+        return null;
     }
 }
 
-// b) Agregar un nuevo personaje (POST). Solos se puede modificar.
-
-async function agregarPersonajeApi(nuevo) {
+async function obtenerPersonajesDesdeFS(archivo) {
     try {
-        const resp = await fetch(url, {
+        const datos = await fs.readFile(archivo, 'utf-8');
+        return JSON.parse(datos);
+    } catch (error) {
+        if (error.code === 'ENOENT') { // Manejar el error cuando el archivo no existe.
+            return null;
+        }
+        console.error("Error al leer el sistema de archivos: ", error);
+        return null;
+    }
+}
+
+function guardarPersonajesEnJSON(personajes) {
+    fs.writeFile(nombreArchivo, JSON.stringify(personajes, null, 2));
+}
+
+
+// 1.a) Recuperar la información de todos los personajes (GET).
+async function obtenerPersonajes() {
+    try {
+        let personajes = await obtenerPersonajesDesdeFS(nombreArchivo);
+        if (!personajes) {
+            personajes = await obtenerPersonajesDesdeUrl()
+            
+            // 1.d) Persistir los datos de la primer consulta en un archivo local JSON.
+            if (personajes) {
+                guardarPersonajesEnJSON(personajes);
+            }
+        }
+        return personajes;
+    } catch (error) {
+        console.error("Error en fetch de personajes: ", error);
+    }
+}
+
+const personajes = await obtenerPersonajes();
+// console.log(personajes);
+
+function obtenerMayorId(personajes) {
+    if (personajes) {
+        const personajesIds = personajes.map(personaje => personaje.id);
+        const idsOrdenados = personajesIds.sort((a, b) => a - b);
+        return idsOrdenados[idsOrdenados.length - 1]
+    } else {
+        console.error('No se encontraron personajes.')
+    }
+}
+
+
+// 1.b) Agregar un nuevo personaje (POST). Solos se puede modificar.
+async function agregarPersonajeApi(personaje) {
+    try {
+        const res = await fetch(url, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(nuevo)
+            body: JSON.stringify(personaje)
         })
 
-        if (!resp.ok) {
-            console.log(`Error en la petición ${resp.status}`);
+        if (!res.ok) {
+            throw new Error(`Error en la creación del personaje: status ${res.status}`);
         }
 
-        const agrego = await resp.json();
-        return agrego
+        console.log(`Petición exitosa. El servidor respondió con status: ${res.status}`);
+        console.log('Personaje agregado:', personaje)
 
+        const textoRes = await res.text();
+
+        if (!textoRes) {
+            console.log('Personaje aceptado por el servidor (no devolvió datos adicionales en el body).');
+            return res.status;
+        }
+
+        const personajeAgregado = await res.json();
+        console.log('Personaje creado exitosamente:', personajeAgregado);
+        return personajeAgregado
     } catch (error) {
-        console.log(`Error ${error}`);
+        console.log(`Error al agregar personaje a la API: ${error}`);
     }
 }
 
-const agregar = {
-    id: 0,
+const personajeNuevo = {
+    id: 100,
     firstName: "Ryan",
     lastName: "Dahl",
     fullName: "Ryan Dahl",
@@ -51,61 +113,50 @@ const agregar = {
     image: "ryan-dahl.jpg",
     imageUrl: "https://en.wikipedia.org/wiki/Ryan_Dahl#/media/File:Ryan_Dahl.jpg"
 }
+// agregarPersonajeApi(personajeNuevo)
 
 
-// c) Buscar la información de un determinado personaje, utilizando un “id” como parámetro
-// (GET).
-
-async function obtenerPersonaje(id) {
+// 1.c) Buscar la información de un determinado personaje, utilizando un “id” como parámetro
+async function obtenerPersonajePorId(id) {
     try {
-        const resp = await fetch(`${url}/${id}`);
+        const res = await fetch(`${url}/${id}`);
 
-        if (!resp.ok) {
-            console.log("Error en la petición");
+        if (!res.ok) {
+            console.log("Error en la petición de personaje");
         }
 
-        const obtener = await resp.json();
-        const final = JSON.stringify(obtener, null, 2)
-        return final
-
+        const personaje = await res.json();
+        return personaje
     } catch (error) {
-        console.log(`Error ${error}`);
+        console.log(`Error al obtener personaje por ID: ${error}`);
     }
 }
 
-// d) Persistir los datos de la primer consulta en un archivo local JSON.
-import fs from 'fs/promises';
+const robb = await obtenerPersonajePorId(11)
+// console.log(robb)
 
-async function persistirPersonajes() {
-    try {
-        const listaApi = await mostrarPersonaje();
-
-        await fs.writeFile("./personajes.json", listaApi);
-
-        return "Archivo guardado correctamente";
-
-    } catch (error) {
-        console.log(`Error: ${error.message}`);
-    }
-}
 
 // Métodos comunes y avanzados – File System
-// a) Agregar un personaje al final del archivo.
+// 2.a) Agregar un personaje al final del archivo.
+const agregarPersonaje = async (personaje) => {
+    try {
+        const personajes = await obtenerPersonajes();
+        const mayorId = obtenerMayorId(personajes);
 
-const agregarPersonaje = async (nuevo) => {
-    const datos = await fs.readFile("./personajes.json", "utf-8");
+        let personajeNuevo = {
+            id: mayorId + 1,
+            ...personaje
+        }
 
-    const listaPersonajes = JSON.parse(datos);
-    listaPersonajes.push(nuevo);
-
-    await fs.writeFile("./personajes.json", JSON.stringify(listaPersonajes, null, 2))
-
-    return ("Nuevo personaje agregado correctamente")
-
+        personajes.push(personajeNuevo);
+        guardarPersonajesEnJSON(personajes)
+        console.log("Nuevo personaje agregado correctamente al final del archivo:", nuevo.fullName)
+    } catch (error) {
+        console.log('Error al agregar al personaje final del archivo', error)
+    }
 }
 
 const nuevoPersonaje = {
-    id: 54,
     firstName: "Ryan",
     lastName: "Dahl",
     fullName: "Ryan Dahl",
@@ -115,126 +166,102 @@ const nuevoPersonaje = {
     imageUrl: "https://en.wikipedia.org/wiki/Ryan_Dahl#/media/File:Ryan_Dahl.jpg"
 }
 
+// agregarPersonaje(nuevoPersonaje)
 
-// b) Agregar dos personajes al inicio del archivo.
-const agregarDosPersonajes = async (nuevo) => {
-    const datos = await fs.readFile("./personajes.json", "utf-8");
 
-    const listaPersonajes = JSON.parse(datos);
-    listaPersonajes.unshift(...nuevo);
-
-    await fs.writeFile("./personajes.json", JSON.stringify(listaPersonajes, null, 2))
-
-    return ("Nuevos personajes agregados correctamente")
+// 2.b) Agregar dos personajes al inicio del archivo.
+const agregarDosPersonajes = async (pers1, pers2) => {
+    try {
+        const personajes = await obtenerPersonajes();
+        const mayorId = obtenerMayorId(personajes);
+    
+        const n1 = {
+            id: mayorId + 1,
+            ...pers1
+        }
+    
+        const n2 = {
+            id: mayorId + 2,
+            ...pers2
+        }
+    
+        personajes.unshift(n1, n2);
+        guardarPersonajesEnJSON(personajes)
+        console.log(`Nuevos personajes agregados correctamente: ${n1.fullName} y ${n2.fullName}`)
+    } catch (error) {
+        console.log('Error al agregar personajes al inicio del archivo:', error)
+    }
 
 }
 
-const nuevosPersonajes = [{
-    id: 55,
+const p1 = {
     firstName: "Brendan",
     lastName: "Eich",
     fullName: "Brendan Eich",
     title: "King of JS",
     family: "JS",
     image: "ryan-dahl.jpg",
-    imageUrl: "https://en.wikipedia.org/wiki/Ryan_Dahl#/media/File:Ryan_Dahl.jpg"},
-    {id: 56,
+    imageUrl: "https://en.wikipedia.org/wiki/Ryan_Dahl#/media/File:Ryan_Dahl.jpg"
+};
+const p2 = {
     firstName: "Guido",
     lastName: "van Rossum",
     fullName: "Guido van Rossum",
     title: "King of Python",
     family: "C++",
     image: "ryan-dahl.jpg",
-    imageUrl: "https://en.wikipedia.org/wiki/Ryan_Dahl#/media/File:Ryan_Dahl.jpg"}
-]
-
-// c) Eliminar el primer personaje, mostrar en consola el elemento eliminado.
-const eliminarPrimero = async () => {
-    const datos = await fs.readFile("./personajes.json", "utf-8");
-
-    const lista = JSON.parse(datos);
-    const eliminado = lista.shift();
-    const mostrar = JSON.stringify(eliminado, null, 2)
-
-    const final = JSON.stringify(lista, null, 2);
-    await fs.writeFile("./personajes.json", final)
-
-    return mostrar;
+    imageUrl: "https://en.wikipedia.org/wiki/Ryan_Dahl#/media/File:Ryan_Dahl.jpg"
 }
 
-// d) Crear un nuevo archivo que solo contenga los: id y nombres de los personajes.
+// agregarDosPersonajes(p1, p2)
 
-const listaCompleta = await mostrarPersonaje();
 
-const listaArray = JSON.parse(listaCompleta);
+// 2.c) Eliminar el primer personaje, mostrar en consola el elemento eliminado.
+const eliminarPrimerPersonaje = async () => {
+    try {
+        const personajes = await obtenerPersonajes();
+        const eliminado = personajes.shift();
+        
+        guardarPersonajesEnJSON(personajes)
+        console.log(`Se ha eliminado a: ${eliminado.fullName}`);
+    } catch (error) {
+        console.error('Error al eliminar el primer personaje del archivo:', error)
+    }
+}
 
-let listaReducida = listaArray.map( personaje =>  ({
-    id: personaje.id,
-    fullName: personaje.fullName
-}));
+// eliminarPrimerPersonaje()
 
-const crearNuevoArchivo = async (listaReducida) => {
+// 2.d) Crear un nuevo archivo que solo contenga los: id y nombres de los personajes.
+async function crearArchivoReducido() {
+    try {
+        const personajes = await obtenerPersonajes();
+
+        let listaReducida = personajes.map(personaje => ({
+            id: personaje.id,
+            fullName: personaje.fullName
+        }));
+
+        await fs.writeFile(nombreArchivoReducido, JSON.stringify(listaReducida, null, 2))
+        console.log("Nuevo archivo reducido creado correctamente.")
+    } catch (error) {
+        console.log('Error al crear lista reducida:', error)
+    }
+}
+
+// crearArchivoReducido()
+
+// 2.e) Para los datos anteriores ordenar por nombre y de forma decreciente, luego mostrar por consola.
+const ordenarPersonajesFormaDescendiente = async () => {
+    try {
+        const personajesReducido = await obtenerPersonajesDesdeFS(nombreArchivoReducido)
     
-    await fs.writeFile("./archivo2.json", JSON.stringify(listaReducida, null, 2))
-    return ("Nuevo archivo creado correctamente.")
-
-} 
-
-// e) Para los datos anteriores ordenar por nombre y de forma decreciente, luego mostrar por consola (investigar método sort()).
-
-const ordenar = async () => {
-    const listaDesordenada = await fs.readFile("./archivo2.json", "utf-8");
-    const lista = JSON.parse(listaDesordenada);
-
-    lista.sort((a, b) => (a.fullName < b.fullName ? 1 : -1));
-
-    const mostrar = JSON.stringify(lista, null, 2)
-
-    await fs.writeFile("./archivo2.json", mostrar)
-
-    return mostrar;
-}
-
-// Imprimir en consola para verificar todas las operaciones realizadas.
-async function main() {
-    const mostrar = await mostrarPersonaje();
-    console.log(`a) Recuperar la información de todos los personajes (GET). ${mostrar}`)
-
-    const agregarApi = await agregarPersonajeApi(agregar);
-    console.log(`b) Agregar un nuevo personaje (POST). Solos se puede modificar. ${agregarApi}`)
-
-    const buscar = await obtenerPersonaje(11);
-    console.log(`c) Buscar la información de un determinado personaje, utilizando un “id” como parámetro ${buscar}`)
-
-    const persistir = await persistirPersonajes();
-    console.log(`d) Persistir los datos de la primer consulta en un archivo local JSON. ${persistir}`)
-
-    console.log(`Métodos comunes y avanzados – File System`)
+        personajesReducido.sort((a, b) => (a.fullName < b.fullName ? 1 : -1));
     
-    const nuevo = await agregarPersonaje(nuevoPersonaje);
-    console.log(`a) Agregar un personaje al final del archivo. ${nuevo}`)
-
-    const nuevos = await agregarDosPersonajes(nuevosPersonajes);
-    console.log(`b) Agregar dos personajes al inicio del archivo. ${nuevos}`)
-
-    const eliminado = await eliminarPrimero(0);
-    console.log(`c) Eliminar el primer personaje, mostrar en consola el elemento eliminado. ${eliminado}`)
-
-    const mensaje = await crearNuevoArchivo(listaReducida);
-    console.log(`d) Crear un nuevo archivo que solo contenga los: id y nombres de los personajes. ${mensaje}`)
-
-    const mostrarLista = await ordenar();
-    console.log(`e) Para los datos anteriores ordenar por nombre y de forma decreciente, luego mostrar por
-consola (investigar método sort()).${mostrarLista}`)
-
+        console.log('Los personajes ordenados de forma decreciente son:', personajesReducido)
+    } catch (error) {
+        console.log('Error al ordenar personajes:', error)
+    }
 }
 
-main();
-
-
-
-
-
-
-
+// ordenarPersonajesFormaDescendiente()
 
