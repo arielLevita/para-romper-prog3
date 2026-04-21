@@ -5,9 +5,6 @@ const url = "https://thronesapi.com/api/v2/Characters";
 const fileName = 'characters.json';
 const reducedFileName = 'reducedCharacters.json';
 
-function saveCharactersToJSON(characters) {
-    fs.promises.writeFile(fileName, JSON.stringify(characters, null, 2));
-}
 
 async function getCharactersFromUrl() {
     try {
@@ -15,7 +12,7 @@ async function getCharactersFromUrl() {
         if (!res.ok) {
             throw new Error(`Error HTTP: ${res.status}`);
         }
-
+                
         const characters = await res.json();
         return characters;
     } catch (error) {
@@ -37,12 +34,16 @@ async function getCharactersFromFS(file) {
     }
 }
 
+function saveCharactersToJSON(characters) {
+    fs.promises.writeFile(fileName, JSON.stringify(characters, null, 2));
+}
+
 async function getCharacters() {
     try {
         let characters = await getCharactersFromFS(fileName);
         if (!characters) {
             characters = await getCharactersFromUrl()
-
+            
             if (characters) {
                 saveCharactersToJSON(characters);
             }
